@@ -51,12 +51,18 @@ public class BookForm extends JFrame {
 
         JPanel buttonPanel = new JPanel();
         JButton addButton = new JButton("Add");
+        JButton updateButton = new JButton("Update");
+        JButton deleteButton = new JButton("Delete");
         JButton refreshButton = new JButton("Refresh");
 
         addButton.addActionListener(e -> addBookViaAPi());
+        updateButton.addActionListener(e -> updateBookViaAPI());
+        deleteButton.addActionListener(e -> deleteBookViaAPI());
         refreshButton.addActionListener(e -> loadDataFromAPI());
 
         buttonPanel.add(addButton);
+        buttonPanel.add(updateButton);
+        buttonPanel.add(deleteButton);
         buttonPanel.add(refreshButton);
 
         controlPanel.add(inputPanel);
@@ -124,6 +130,85 @@ public class BookForm extends JFrame {
             } else {
                 JOptionPane.showMessageDialog(this, "Gagal menambahkan buku. Code: " + responseCode);
             }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error:\n" + ex.getMessage());
+        }
+    }
+
+    @SuppressWarnings({ "UseSpecificCatch", "deprecation" })
+    private void updateBookViaAPI() {
+        String title = titleField.getText().trim();
+        String author = authorField.getText().trim();
+        int selectedRow = table.getSelectedRow();
+
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Pilih buku yang akan diubah!");
+            return;
+        }
+
+        if (title.isEmpty() || author.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Judul dan Penulis harus diisi!");
+            return;
+        }
+
+        try {
+            long selectedID = (long) table.getValueAt(selectedRow, 0);
+
+            URL url = new URL("http://localhost:4567/api/books/" + selectedID);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("PUT");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            String jsonBody = new Gson().toJson(new Book(0, title, author));
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(jsonBody.getBytes());
+                os.flush();
+            }
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode >= 200 && responseCode < 300) {
+                JOptionPane.showMessageDialog(this, "Buku berhasil diubah!");
+                titleField.setText("");
+                authorField.setText("");
+                loadDataFromAPI();
+            } else {
+                JOptionPane.showMessageDialog(this, "Gagal mengubah buku. Code: " + responseCode);
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error:\n" + ex.getMessage());
+        }
+    }
+
+    @SuppressWarnings({ "UseSpecificCatch", "deprecation" })
+    private void deleteBookViaAPI() {
+        int[] selectedRows = table.getSelectedRows();
+
+        if (selectedRows.length == 0) {
+            JOptionPane.showMessageDialog(this, "Pilih setidaknya satu buku untuk dihapus!");
+            return;
+        }
+
+        try {
+            boolean needRefresh = false;
+            for (int row : selectedRows) {
+                long selectedID = (long) table.getValueAt(row, 0);
+
+                URL url = new URL("http://localhost:4567/api/books/" + selectedID);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("DELETE");
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode >= 200 && responseCode < 300) {
+                    JOptionPane.showMessageDialog(this, "Buku berhasil dihapus!");
+                    needRefresh = true;
+                } else {
+                    JOptionPane.showMessageDialog(this, "Gagal menghapus buku dengan id " + selectedID + ". Code: " + responseCode);
+                }
+            }
+
+            if (needRefresh)
+            loadDataFromAPI();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error:\n" + ex.getMessage());
         }
